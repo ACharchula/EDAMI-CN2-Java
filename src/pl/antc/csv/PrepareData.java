@@ -40,7 +40,7 @@ public class PrepareData {
 
     private static void discretization(List<List<String>> data, int column) {
         Set<String> possibleValues = new HashSet<>();
-        for (List<String> row : data.subList(1, data.size()-1)) {
+        for (List<String> row : data.subList(1, data.size())) {
             possibleValues.add(row.get(column));
         }
 
@@ -61,7 +61,7 @@ public class PrepareData {
         String third = "[" + secondIntervalEdge + ";" + thirdIntervalEdge + ")";
         String forth = "[" + thirdIntervalEdge + ";" + max + "]";
 
-        for (List<String> row : data.subList(1, data.size() - 1)) {
+        for (List<String> row : data.subList(1, data.size())) {
             float value = Float.parseFloat(row.get(column));
             if (value >= min && value < firstIntervalEdge) {
                 row.set(column, first);

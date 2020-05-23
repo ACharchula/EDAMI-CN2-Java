@@ -24,4 +24,17 @@ public class Selector {
     public void setValue(String value) {
         this.value = value;
     }
+
+    public Selector clone() {
+        return new Selector(this.attribute, this.value);
+    }
+
+    public boolean attEq(Selector selector) {
+        return this.attribute.equals(selector.attribute);
+    }
+
+    @Override
+    public String toString() {
+        return "("+attribute+"->"+value+")";
+    }
 }

@@ -35,4 +35,14 @@ public class CsvDataHandler {
     private static String convertToCsvLine(List<String> values) {
         return String.join(",", values);
     }
+
+    public static List<List<String>> copy(List<List<String>> data) {
+        List<List<String>> copied = new ArrayList<>();
+
+        for (List<String> row : data) {
+            copied.add(new ArrayList<>(row));
+        }
+
+        return copied;
+    }
 }

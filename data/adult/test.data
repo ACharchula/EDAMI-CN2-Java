@@ -6031,4 +6031,4 @@ age,workclass,fnlwgt,education,education-num,marital-status,occupation,relations
 [35.25;53.5),Private,[13769.0;381503.0),HS-grad,[8.5;12.25),Married-civ-spouse,Machine-op-inspct,Husband,White,Male,[0.0;24999.75),[0.0;1089.0),[25.5;50.0),United-States,>50K
 [53.5;71.75),Private,[13769.0;381503.0),HS-grad,[8.5;12.25),Widowed,Adm-clerical,Unmarried,White,Female,[0.0;24999.75),[0.0;1089.0),[25.5;50.0),United-States,<=50K
 [17.0;35.25),Private,[13769.0;381503.0),HS-grad,[8.5;12.25),Never-married,Adm-clerical,Own-child,White,Male,[0.0;24999.75),[0.0;1089.0),[1.0;25.5),United-States,<=50K
-52,Self-emp-inc,287927,HS-grad,9,Married-civ-spouse,Exec-managerial,Wife,White,Female,15024,0,40,United-States,>50K
+[35.25;53.5),Self-emp-inc,[13769.0;381503.0),HS-grad,[8.5;12.25),Married-civ-spouse,Exec-managerial,Wife,White,Female,[0.0;24999.75),[0.0;1089.0),[25.5;50.0),United-States,>50K

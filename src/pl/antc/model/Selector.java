@@ -29,7 +29,7 @@ public class Selector {
         return new Selector(this.attribute, this.value);
     }
 
-    public boolean attEq(Selector selector) {
+    public boolean equalAttributes(Selector selector) {
         return this.attribute.equals(selector.attribute);
     }
 

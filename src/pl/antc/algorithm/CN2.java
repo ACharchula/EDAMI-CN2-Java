@@ -6,15 +6,13 @@ import pl.antc.model.Selector;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public class CN2 {
 
-    private List<List<String>> data;
     private List<List<String>> E = new ArrayList<>();
     private final List<Selector> selectors = new ArrayList<>();
-    private final List<Selector> possibleResults = new ArrayList<>();
     private final Map<String, Integer> attributes = new HashMap<>();
     private Map<String, Double> allResultsProbability = new HashMap<>();
 
@@ -31,21 +29,11 @@ public class CN2 {
         while (E.size() > 0) {
             List<Selector> bestComplex = findBestComplex();
             if (bestComplex != null) {
-                List<Integer> covered = coveredRowsIndices(E, bestComplex);
-                String mostCommonClass = getMostCommon(covered);
-                List<List<String>> newE = new ArrayList<>();
-                for (int i = 0; i < E.size(); ++i) {
-                    if (!covered.contains(i)){
-                        newE.add(E.get(i));
-                    }
-                }
-                E = newE;
-
-                countProbabilityForResultsInE();
-
-                ruleList.add(new Rule(bestComplex, mostCommonClass));
-                List<String> cpx = bestComplex.stream().map(Selector::toString).collect(Collectors.toList());
-                System.out.println(String.join(",", cpx) + " => " + mostCommonClass + "(" + E.size() + ")");
+                String mostCommonResult = processComplex(bestComplex);
+                ruleList.add(new Rule(bestComplex, mostCommonResult));
+//                Rule rule = new Rule(bestComplex, mostCommonResult);
+//                ruleList.add(rule);
+//                System.out.println(rule + " (" + E.size() + ")");
             } else {
                 break;
             }
@@ -53,8 +41,90 @@ public class CN2 {
         return ruleList;
     }
 
+    public void trainAndTest(String trainFilePath, String testFilePath, int starMaxSize, double minSignificance) throws IOException {
+        System.out.println("=== TRAINING ===");
+        System.out.println("Max size of star: " + starMaxSize);
+        System.out.println("Min significance: " + minSignificance);
+        long startTime = new Date().getTime();
+        List<Rule> ruleList = train(trainFilePath, starMaxSize, minSignificance);
+        long endTime = new Date().getTime();
+        System.out.println("Amount of rules: " + ruleList.size());
+        System.out.println("Training time [minutes]: " + TimeUnit.MILLISECONDS.toMinutes(endTime - startTime));
+
+
+        test(testFilePath, ruleList);
+    }
+
+    private String processComplex(List<Selector> bestComplex) {
+        Map<String, Integer> coveredRowsResults = new HashMap<>();
+        Map<String, Integer> leftRowsResults = new HashMap<>();
+
+        E.removeIf(row -> {
+            String result = row.get(row.size()-1);
+            if (isComplexCoveringRow(row, bestComplex)) {
+                addNewOrIncrement(coveredRowsResults, result);
+                return true;
+            } else {
+                addNewOrIncrement(leftRowsResults, result);
+                return false;
+            }
+        });
+
+        for (String key : leftRowsResults.keySet()) {
+            double probability = (float) leftRowsResults.get(key) / E.size();
+            allResultsProbability.replace(key, probability);
+        }
+
+        String max = null;
+        int maxV = -1;
+
+        for (String key : coveredRowsResults.keySet()) {
+            int result = coveredRowsResults.get(key);
+            if (result > maxV) {
+                maxV = result;
+                max = key;
+            }
+        }
+        return max;
+    }
+
+    private Map<String, Double> getCoveredResultsProbabilities(List<Selector> complex) {
+        Map<String, Integer> coveredRowsResults = new HashMap<>();
+        int amountOfCoveredRows = 0;
+        for (List<String> row : E) {
+            if (isComplexCoveringRow(row, complex)) {
+                addNewOrIncrement(coveredRowsResults, row.get(row.size()-1));
+                amountOfCoveredRows++;
+            }
+        }
+        Map<String, Double> probabilities = new HashMap<>();
+        for (String key : coveredRowsResults.keySet()) {
+            double probability = (float) coveredRowsResults.get(key) / amountOfCoveredRows;
+            probabilities.put(key, probability);
+        }
+        return probabilities;
+    }
+
+    private void addNewOrIncrement(Map<String, Integer> map, String key) {
+        Integer value = map.get(key);
+        if (value != null) {
+            map.replace(key, ++value);
+        } else {
+            map.put(key, 1);
+        }
+    }
+
+    private boolean isComplexCoveringRow(List<String> row, List<Selector> complex) {
+        for (Selector selector : complex) {
+            int index = attributes.get(selector.getAttribute());
+            if (!row.get(index).equals(selector.getValue()))
+                return false;
+        }
+        return true;
+    }
+
     private void prepare(String filePath) throws IOException {
-        data = CsvDataHandler.readCsv(filePath);
+        List<List<String>> data = CsvDataHandler.readCsv(filePath);
         E = data.subList(1, data.size());
         List<String> attributes = data.get(0);
 
@@ -62,7 +132,8 @@ public class CN2 {
             this.attributes.put(attributes.get(i), i);
         }
 
-        countProbabilityForResultsInE();
+        List<String> results = E.stream().map(a -> a.get(a.size()-1)).collect(Collectors.toList());
+        allResultsProbability = getResultProbability(results);
 
         for (int i = 0; i < attributes.size(); i++) {
             Set<String> possibleValues = new HashSet<>();
@@ -75,40 +146,24 @@ public class CN2 {
                     selectors.add(new Selector(attributes.get(i), value));
                 }
             }
-//            if (i == attributes.size() - 1) {
-//                for (String value : possibleValues) {
-//                    possibleResults.add(new Selector(attributes.get(i), value));
-//                }
-//            } else {
-//                for (String value : possibleValues) {
-//                    selectors.add(new Selector(attributes.get(i), value));
-//                }
-//            }
         }
-    }
-
-    private void countProbabilityForResultsInE() {
-        List<String> results = E.stream().map(a -> a.get(a.size()-1)).collect(Collectors.toList());
-        allResultsProbability = getResultProbability(results);
     }
 
     private List<Selector> findBestComplex() {
         List<Selector> bestComplex = null;
         double bestComplexEntropy = Double.MAX_VALUE;
-        double bestComplexSignificance = 0;
+        double bestComplexSignificance = 0.0;
         List<List<Selector>> star = new ArrayList<>();
         do {
             Map<Double, Integer> entropyMeasures = new HashMap<>();
             List<List<Selector>> newStar = setNewStar(star);
             for (int i = 0; i < newStar.size(); ++i) {
                 List<Selector> complex = newStar.get(i);
-                List<String> coveredRowsResults = getResultsOfCoveredRows(E, complex);
-                HashMap<String, Double> resultProb = getResultProbability(coveredRowsResults); //TODO maybe all result prop should change with E
+                Map<String, Double> resultProb = getCoveredResultsProbabilities(complex);
                 double significance = calculateSignificance(resultProb);
                 if (significance > minSignificance) {
                     double entropy = calculateEntropy(resultProb);
-                    if (entropy == 0)
-                        return cloneComplex(complex);
+                    if (entropy == 0.0) return cloneComplex(complex);
                     entropyMeasures.put(entropy, i);
                     if (entropy < bestComplexEntropy) {
                         bestComplex = cloneComplex(complex);
@@ -117,24 +172,28 @@ public class CN2 {
                     }
                 }
             }
-            List<Double> entropies = new ArrayList<>(entropyMeasures.keySet());
-            if (entropies.size() == 0) {
-                break;
-            }
-            Collections.sort(entropies);
-            List<Double> bestEntropies = null;
-            if (entropies.size() < starMaxSize) {
-                bestEntropies = entropies;
-            } else {
-                bestEntropies = entropies.subList(0, starMaxSize);
-            }
-            star.clear();
-            for (Double entropy : bestEntropies) {
-                star.add(newStar.get(entropyMeasures.get(entropy)));
-            }
+
+            if (entropyMeasures.keySet().size() == 0) break;
+            star = getNewStar(entropyMeasures, newStar);
         } while (star.size() != 0 && !(bestComplexSignificance < minSignificance));
 
         return bestComplex;
+    }
+
+    private List<List<Selector>> getNewStar(Map<Double, Integer> entropyMeasures, List<List<Selector>> previousStar) {
+        List<Double> entropies = new ArrayList<>(entropyMeasures.keySet());
+        Collections.sort(entropies);
+        List<Double> bestEntropies;
+        if (entropies.size() <= starMaxSize) {
+            bestEntropies = entropies;
+        } else {
+            bestEntropies = entropies.subList(0, starMaxSize);
+        }
+        List<List<Selector>> newStar = new ArrayList<>();
+        for (Double entropy : bestEntropies) {
+            newStar.add(previousStar.get(entropyMeasures.get(entropy)));
+        }
+        return newStar;
     }
 
     public void test(String filePath, List<Rule> rules) throws IOException {
@@ -152,6 +211,8 @@ public class CN2 {
             else ruleNotFound++;
         }
 
+        System.out.println("=== TESTING === ");
+        System.out.println("Amount of test rows: " + testData.size());
         System.out.println("Correct: " + correct);
         System.out.println("Incorrect: " + incorrect);
         System.out.println("Rule not found: " + ruleNotFound);
@@ -160,7 +221,7 @@ public class CN2 {
 
     private int predict(List<String> data, List<Rule> rules, List<String> columns) {
         for (Rule rule : rules) {
-            if (isComplexMatching(data, rule, columns)) {
+            if (isComplexCoveringRow(data, rule.getComplex())) {
                 if (rule.getResult().equals(data.get(data.size() - 1))) {
                     return 1;
                 } else {
@@ -171,43 +232,6 @@ public class CN2 {
         return 0;
     }
 
-    private boolean isComplexMatching(List<String> data, Rule rule, List<String> columns) {
-        for (Selector selector : rule.getComplex()) {
-            for (int i = 0; i < data.size(); ++i) {
-                if (columns.get(i).equals(selector.getAttribute())) {
-                    if (!data.get(i).equals(selector.getValue()))
-                        return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private String getMostCommon(List<Integer> indices) {
-        List<String> results = new ArrayList<>();
-        for (Integer i : indices) {
-            results.add(E.get(i).get(E.get(0).size() - 1));
-        }
-        Map<String, Integer> amount = new HashMap<>();
-        for (String key : results) {
-            Integer a = amount.get(key);
-            if (a == null) {
-                amount.put(key, 1);
-            } else {
-                amount.replace(key, a+1);
-            }
-        }
-        String max = null;
-        int maxV = -1;
-
-        for (String key : amount.keySet()) {
-            if (amount.get(key) > maxV) {
-                max = key;
-            }
-        }
-        return max;
-    }
-
     private List<Selector> cloneComplex(List<Selector> complex) { //TODO duplicate
         List<Selector> cloned = new ArrayList<>();
         for (Selector selector : complex) {
@@ -216,7 +240,7 @@ public class CN2 {
         return cloned;
     }
 
-    private double calculateSignificance(HashMap<String, Double> resultProb) {
+    private double calculateSignificance(Map<String, Double> resultProb) {
         List<Double> tmp = new ArrayList<>();
         for (String key : resultProb.keySet()) {
             double log = Math.log(resultProb.get(key) / allResultsProbability.get(key));
@@ -225,7 +249,7 @@ public class CN2 {
         return tmp.stream().mapToDouble(Double::doubleValue).sum() * 2;
     }
 
-    private double calculateEntropy(HashMap<String, Double> resultProb) {
+    private double calculateEntropy(Map<String, Double> resultProb) {
         List<Double> tmp = new ArrayList<>();
         for (String key : resultProb.keySet()) {
             double log = log2(resultProb.get(key));
@@ -252,35 +276,7 @@ public class CN2 {
             double probability = map.get(key) / results.size();
             map.replace(key, probability);
         }
-
-//        for (String key : allResultsProbability.keySet()) {
-//            map.putIfAbsent(key, 0.0);
-//        }
-
         return map;
-    }
-
-    private List<String> getResultsOfCoveredRows(List<List<String>> data, List<Selector> complex) {
-        List<Integer> coveredRows = coveredRowsIndices(data, complex);
-        List<String> result = new ArrayList<>();
-        for (Integer i : coveredRows) {
-            result.add(data.get(i).get(data.get(0).size() - 1));
-        }
-        return result;
-    }
-
-    private List<Integer> coveredRowsIndices(List<List<String>> data, List<Selector> complex) {
-        List<Integer> coveredRows = IntStream.range(0, data.size()).boxed().collect(Collectors.toList()); //TODO check range
-        for (Selector selector : complex) {
-            coveredRows.removeIf(i -> !isRowCovered(data.get(i), selector));
-        }
-        return coveredRows;
-    }
-
-    private boolean isRowCovered(List<String> row, Selector selector) {
-        int index = this.attributes.get(selector.getAttribute());
-        String value = row.get(index);
-        return value.equals(selector.getValue());
     }
 
     private List<List<Selector>> setNewStar(List<List<Selector>> star) {
@@ -305,7 +301,7 @@ public class CN2 {
 
     private List<Selector> returnNewComplexIfNotADuplicate(List<Selector> complex, Selector selector) {
         for (Selector s : complex) {
-            if (s.attEq(selector)) {
+            if (s.equalAttributes(selector)) {
                 return null;
             }
         }

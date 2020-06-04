@@ -1,6 +1,7 @@
 package pl.antc.model;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Rule {
     List<Selector> complex;
@@ -25,5 +26,11 @@ public class Rule {
 
     public void setResult(String result) {
         this.result = result;
+    }
+
+    @Override
+    public String toString() {
+        List<String> cpx = complex.stream().map(Selector::toString).collect(Collectors.toList());
+        return String.join(",", cpx) + " => " + result;
     }
 }

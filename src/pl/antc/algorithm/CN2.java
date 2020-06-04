@@ -30,10 +30,10 @@ public class CN2 {
             List<Selector> bestComplex = findBestComplex();
             if (bestComplex != null) {
                 String mostCommonResult = processComplex(bestComplex);
-                ruleList.add(new Rule(bestComplex, mostCommonResult));
-//                Rule rule = new Rule(bestComplex, mostCommonResult);
-//                ruleList.add(rule);
-//                System.out.println(rule + " (" + E.size() + ")");
+//                ruleList.add(new Rule(bestComplex, mostCommonResult));
+                Rule rule = new Rule(bestComplex, mostCommonResult);
+                ruleList.add(rule);
+                System.out.println(rule + " (" + E.size() + ")");
             } else {
                 break;
             }
@@ -50,7 +50,6 @@ public class CN2 {
         long endTime = new Date().getTime();
         System.out.println("Amount of rules: " + ruleList.size());
         System.out.println("Training time [minutes]: " + TimeUnit.MILLISECONDS.toMinutes(endTime - startTime));
-
 
         test(testFilePath, ruleList);
     }
@@ -198,14 +197,13 @@ public class CN2 {
 
     public void test(String filePath, List<Rule> rules) throws IOException {
         List<List<String>> testData = CsvDataHandler.readCsv(filePath);
-        List<String> columns = testData.get(0);
         testData = testData.subList(1, testData.size());
 
         int correct = 0;
         int incorrect = 0;
         int ruleNotFound = 0;
         for (List<String> row : testData) {
-            int result = predict(row, rules, columns);
+            int result = predict(row, rules);
             if (result == 1) correct++;
             else if (result == -1) incorrect++;
             else ruleNotFound++;
@@ -216,10 +214,10 @@ public class CN2 {
         System.out.println("Correct: " + correct);
         System.out.println("Incorrect: " + incorrect);
         System.out.println("Rule not found: " + ruleNotFound);
-        System.out.println("Accuracy: " + (float) correct / (incorrect+ruleNotFound));
+        System.out.println("Accuracy: " + (float) correct / testData.size());
     }
 
-    private int predict(List<String> data, List<Rule> rules, List<String> columns) {
+    private int predict(List<String> data, List<Rule> rules) {
         for (Rule rule : rules) {
             if (isComplexCoveringRow(data, rule.getComplex())) {
                 if (rule.getResult().equals(data.get(data.size() - 1))) {

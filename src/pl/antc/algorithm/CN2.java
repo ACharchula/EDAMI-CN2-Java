@@ -3,7 +3,6 @@ package pl.antc.algorithm;
 import pl.antc.csv.CsvDataHandler;
 import pl.antc.model.Rule;
 import pl.antc.model.Selector;
-import pl.antc.model.TextValue;
 
 import java.io.IOException;
 import java.util.*;
@@ -16,26 +15,24 @@ public class CN2 {
     private List<List<String>> E = new ArrayList<>();
     private final List<Selector> selectors = new ArrayList<>();
     private final List<Selector> possibleResults = new ArrayList<>();
-    private Map<String, Integer> attributes = new HashMap<>();
+    private final Map<String, Integer> attributes = new HashMap<>();
     private Map<String, Double> allResultsProbability = new HashMap<>();
 
-    private int starMaxSize = 5;
-    private double minSignificance = 0.8;
+    private int starMaxSize;
+    private double minSignificance;
 
-    List<Rule> ruleList;
-
-    public void train(String filePath) throws IOException {
-        data = CsvDataHandler.readCsv(filePath);
-        E = CsvDataHandler.copy(data).subList(1, data.size());
-        prepare(data);
+    public List<Rule> train(String filePath, int starMaxSize, double minSignificance) throws IOException {
+        this.starMaxSize = starMaxSize;
+        this.minSignificance = minSignificance;
+        prepare(filePath);
 
         List<Rule> ruleList = new ArrayList<>();
 
         while (E.size() > 0) {
-            List<Selector> bestCpx = findBestComplex();
-            if (bestCpx != null) {
-                List<Integer> covered = coveredRowsIndices(E, bestCpx);
-                TextValue mostCommonClass = getMostCommon(covered); //TODO get rid of text value as we not use value
+            List<Selector> bestComplex = findBestComplex();
+            if (bestComplex != null) {
+                List<Integer> covered = coveredRowsIndices(E, bestComplex);
+                String mostCommonClass = getMostCommon(covered);
                 List<List<String>> newE = new ArrayList<>();
                 for (int i = 0; i < E.size(); ++i) {
                     if (!covered.contains(i)){
@@ -44,34 +41,28 @@ public class CN2 {
                 }
                 E = newE;
 
-                ruleList.add(new Rule(bestCpx, mostCommonClass.getText()));
-                List<String> cpx = bestCpx.stream().map(Selector::toString).collect(Collectors.toList());
-                System.out.println(String.join(",", cpx) + " => " + mostCommonClass.getText() + "(" + mostCommonClass.getValue() + ")");
+                countProbabilityForResultsInE();
+
+                ruleList.add(new Rule(bestComplex, mostCommonClass));
+                List<String> cpx = bestComplex.stream().map(Selector::toString).collect(Collectors.toList());
+                System.out.println(String.join(",", cpx) + " => " + mostCommonClass + "(" + E.size() + ")");
             } else {
                 break;
             }
         }
+        return ruleList;
     }
 
-    public void test(String filePath) throws IOException {
-        List<List<String>> testData = CsvDataHandler.readCsv(filePath);
-        testData = testData.subList(1, testData.size());
-
-        for (List<String> row : testData) {
-
-        }
-
-    }
-
-    private void prepare(List<List<String>> data) {
+    private void prepare(String filePath) throws IOException {
+        data = CsvDataHandler.readCsv(filePath);
+        E = data.subList(1, data.size());
         List<String> attributes = data.get(0);
 
         for (int i = 0; i < attributes.size(); ++ i) {
             this.attributes.put(attributes.get(i), i);
         }
 
-        List<String> results = data.subList(1, data.size()).stream().map(a -> a.get(a.size()-1)).collect(Collectors.toList());
-        allResultsProbability = getResultProbability(results);
+        countProbabilityForResultsInE();
 
         for (int i = 0; i < attributes.size(); i++) {
             Set<String> possibleValues = new HashSet<>();
@@ -79,16 +70,26 @@ public class CN2 {
                 possibleValues.add(row.get(i));
             }
 
-            if (i == attributes.size() - 1) {
-                for (String value : possibleValues) {
-                    possibleResults.add(new Selector(attributes.get(i), value));
-                }
-            } else {
+            if (i != attributes.size()-1) {
                 for (String value : possibleValues) {
                     selectors.add(new Selector(attributes.get(i), value));
                 }
             }
+//            if (i == attributes.size() - 1) {
+//                for (String value : possibleValues) {
+//                    possibleResults.add(new Selector(attributes.get(i), value));
+//                }
+//            } else {
+//                for (String value : possibleValues) {
+//                    selectors.add(new Selector(attributes.get(i), value));
+//                }
+//            }
         }
+    }
+
+    private void countProbabilityForResultsInE() {
+        List<String> results = E.stream().map(a -> a.get(a.size()-1)).collect(Collectors.toList());
+        allResultsProbability = getResultProbability(results);
     }
 
     private List<Selector> findBestComplex() {
@@ -102,24 +103,20 @@ public class CN2 {
             for (int i = 0; i < newStar.size(); ++i) {
                 List<Selector> complex = newStar.get(i);
                 List<String> coveredRowsResults = getResultsOfCoveredRows(E, complex);
-                if (coveredRowsResults.size() == 1) continue; //TODO check if significance is well
-                HashMap<String, Double> resultProb = getResultProbability(coveredRowsResults);
+                HashMap<String, Double> resultProb = getResultProbability(coveredRowsResults); //TODO maybe all result prop should change with E
                 double significance = calculateSignificance(resultProb);
                 if (significance > minSignificance) {
                     double entropy = calculateEntropy(resultProb);
+                    if (entropy == 0)
+                        return cloneComplex(complex);
                     entropyMeasures.put(entropy, i);
                     if (entropy < bestComplexEntropy) {
                         bestComplex = cloneComplex(complex);
                         bestComplexEntropy = entropy;
                         bestComplexSignificance = significance;
-                        if (entropy == 0) {
-                            break;
-                        }
                     }
                 }
             }
-            if (bestComplexEntropy == 0)
-                break;
             List<Double> entropies = new ArrayList<>(entropyMeasures.keySet());
             if (entropies.size() == 0) {
                 break;
@@ -140,7 +137,53 @@ public class CN2 {
         return bestComplex;
     }
 
-    private TextValue getMostCommon(List<Integer> indices) {
+    public void test(String filePath, List<Rule> rules) throws IOException {
+        List<List<String>> testData = CsvDataHandler.readCsv(filePath);
+        List<String> columns = testData.get(0);
+        testData = testData.subList(1, testData.size());
+
+        int correct = 0;
+        int incorrect = 0;
+        int ruleNotFound = 0;
+        for (List<String> row : testData) {
+            int result = predict(row, rules, columns);
+            if (result == 1) correct++;
+            else if (result == -1) incorrect++;
+            else ruleNotFound++;
+        }
+
+        System.out.println("Correct: " + correct);
+        System.out.println("Incorrect: " + incorrect);
+        System.out.println("Rule not found: " + ruleNotFound);
+        System.out.println("Accuracy: " + (float) correct / (incorrect+ruleNotFound));
+    }
+
+    private int predict(List<String> data, List<Rule> rules, List<String> columns) {
+        for (Rule rule : rules) {
+            if (isComplexMatching(data, rule, columns)) {
+                if (rule.getResult().equals(data.get(data.size() - 1))) {
+                    return 1;
+                } else {
+                    return -1;
+                }
+            }
+        }
+        return 0;
+    }
+
+    private boolean isComplexMatching(List<String> data, Rule rule, List<String> columns) {
+        for (Selector selector : rule.getComplex()) {
+            for (int i = 0; i < data.size(); ++i) {
+                if (columns.get(i).equals(selector.getAttribute())) {
+                    if (!data.get(i).equals(selector.getValue()))
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private String getMostCommon(List<Integer> indices) {
         List<String> results = new ArrayList<>();
         for (Integer i : indices) {
             results.add(E.get(i).get(E.get(0).size() - 1));
@@ -154,12 +197,12 @@ public class CN2 {
                 amount.replace(key, a+1);
             }
         }
-        TextValue max = null;
+        String max = null;
         int maxV = -1;
 
         for (String key : amount.keySet()) {
             if (amount.get(key) > maxV) {
-                max = new TextValue(key, (((float) amount.get(key))/ indices.size()));
+                max = key;
             }
         }
         return max;
@@ -209,6 +252,10 @@ public class CN2 {
             double probability = map.get(key) / results.size();
             map.replace(key, probability);
         }
+
+//        for (String key : allResultsProbability.keySet()) {
+//            map.putIfAbsent(key, 0.0);
+//        }
 
         return map;
     }

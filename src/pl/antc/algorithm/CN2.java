@@ -3,10 +3,10 @@ package pl.antc.algorithm;
 import pl.antc.csv.CsvDataHandler;
 import pl.antc.model.Rule;
 import pl.antc.model.Selector;
+import pl.antc.model.TestResults;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class CN2 {
@@ -39,87 +39,6 @@ public class CN2 {
             }
         }
         return ruleList;
-    }
-
-    public void trainAndTest(String trainFilePath, String testFilePath, int starMaxSize, double minSignificance) throws IOException {
-        System.out.println("=== TRAINING ===");
-        System.out.println("Max size of star: " + starMaxSize);
-        System.out.println("Min significance: " + minSignificance);
-        long startTime = new Date().getTime();
-        List<Rule> ruleList = train(trainFilePath, starMaxSize, minSignificance);
-        long endTime = new Date().getTime();
-        System.out.println("Amount of rules: " + ruleList.size());
-        System.out.println("Training time [minutes]: " + TimeUnit.MILLISECONDS.toMinutes(endTime - startTime));
-
-        test(testFilePath, ruleList);
-    }
-
-    private String processComplex(List<Selector> bestComplex) {
-        Map<String, Integer> coveredRowsResults = new HashMap<>();
-        Map<String, Integer> leftRowsResults = new HashMap<>();
-
-        E.removeIf(row -> {
-            String result = row.get(row.size()-1);
-            if (isComplexCoveringRow(row, bestComplex)) {
-                addNewOrIncrement(coveredRowsResults, result);
-                return true;
-            } else {
-                addNewOrIncrement(leftRowsResults, result);
-                return false;
-            }
-        });
-
-        for (String key : leftRowsResults.keySet()) {
-            double probability = (float) leftRowsResults.get(key) / E.size();
-            allResultsProbability.replace(key, probability);
-        }
-
-        String max = null;
-        int maxV = -1;
-
-        for (String key : coveredRowsResults.keySet()) {
-            int result = coveredRowsResults.get(key);
-            if (result > maxV) {
-                maxV = result;
-                max = key;
-            }
-        }
-        return max;
-    }
-
-    private Map<String, Double> getCoveredResultsProbabilities(List<Selector> complex) {
-        Map<String, Integer> coveredRowsResults = new HashMap<>();
-        int amountOfCoveredRows = 0;
-        for (List<String> row : E) {
-            if (isComplexCoveringRow(row, complex)) {
-                addNewOrIncrement(coveredRowsResults, row.get(row.size()-1));
-                amountOfCoveredRows++;
-            }
-        }
-        Map<String, Double> probabilities = new HashMap<>();
-        for (String key : coveredRowsResults.keySet()) {
-            double probability = (float) coveredRowsResults.get(key) / amountOfCoveredRows;
-            probabilities.put(key, probability);
-        }
-        return probabilities;
-    }
-
-    private void addNewOrIncrement(Map<String, Integer> map, String key) {
-        Integer value = map.get(key);
-        if (value != null) {
-            map.replace(key, ++value);
-        } else {
-            map.put(key, 1);
-        }
-    }
-
-    private boolean isComplexCoveringRow(List<String> row, List<Selector> complex) {
-        for (Selector selector : complex) {
-            int index = attributes.get(selector.getAttribute());
-            if (!row.get(index).equals(selector.getValue()))
-                return false;
-        }
-        return true;
     }
 
     private void prepare(String filePath) throws IOException {
@@ -195,42 +114,101 @@ public class CN2 {
         return newStar;
     }
 
-    public void test(String filePath, List<Rule> rules) throws IOException {
-        List<List<String>> testData = CsvDataHandler.readCsv(filePath);
-        testData = testData.subList(1, testData.size());
+    private String processComplex(List<Selector> bestComplex) {
+        Map<String, Integer> coveredRowsResults = new HashMap<>();
+        Map<String, Integer> leftRowsResults = new HashMap<>();
 
-        int correct = 0;
-        int incorrect = 0;
-        int ruleNotFound = 0;
-        for (List<String> row : testData) {
-            int result = predict(row, rules);
-            if (result == 1) correct++;
-            else if (result == -1) incorrect++;
-            else ruleNotFound++;
+        E.removeIf(row -> {
+            String result = row.get(row.size()-1);
+            if (isComplexCoveringRow(row, bestComplex)) {
+                addNewOrIncrement(coveredRowsResults, result);
+                return true;
+            } else {
+                addNewOrIncrement(leftRowsResults, result);
+                return false;
+            }
+        });
+
+        for (String key : leftRowsResults.keySet()) {
+            double probability = (float) leftRowsResults.get(key) / E.size();
+            allResultsProbability.replace(key, probability);
         }
 
-        System.out.println("=== TESTING === ");
-        System.out.println("Amount of test rows: " + testData.size());
-        System.out.println("Correct: " + correct);
-        System.out.println("Incorrect: " + incorrect);
-        System.out.println("Rule not found: " + ruleNotFound);
-        System.out.println("Accuracy: " + (float) correct / testData.size());
+        String max = null;
+        int maxV = -1;
+
+        for (String key : coveredRowsResults.keySet()) {
+            int result = coveredRowsResults.get(key);
+            if (result > maxV) {
+                maxV = result;
+                max = key;
+            }
+        }
+        return max;
     }
 
-    private int predict(List<String> data, List<Rule> rules) {
+    private Map<String, Double> getCoveredResultsProbabilities(List<Selector> complex) {
+        Map<String, Integer> coveredRowsResults = new HashMap<>();
+        int amountOfCoveredRows = 0;
+        for (List<String> row : E) {
+            if (isComplexCoveringRow(row, complex)) {
+                addNewOrIncrement(coveredRowsResults, row.get(row.size()-1));
+                amountOfCoveredRows++;
+            }
+        }
+        Map<String, Double> probabilities = new HashMap<>();
+        for (String key : coveredRowsResults.keySet()) {
+            double probability = (float) coveredRowsResults.get(key) / amountOfCoveredRows;
+            probabilities.put(key, probability);
+        }
+        return probabilities;
+    }
+
+    private void addNewOrIncrement(Map<String, Integer> map, String key) {
+        Integer value = map.get(key);
+        if (value != null) {
+            map.replace(key, ++value);
+        } else {
+            map.put(key, 1);
+        }
+    }
+
+    private boolean isComplexCoveringRow(List<String> row, List<Selector> complex) {
+        for (Selector selector : complex) {
+            int index = attributes.get(selector.getAttribute());
+            if (!row.get(index).equals(selector.getValue()))
+                return false;
+        }
+        return true;
+    }
+
+    public TestResults test(String filePath, List<Rule> rules) throws IOException {
+        TestResults testResults = new TestResults();
+        List<List<String>> testData = CsvDataHandler.readCsv(filePath);
+        testData = testData.subList(1, testData.size());
+        testResults.setAmountOfTestRows(testData.size());
+
+        for (List<String> row : testData) {
+            predict(row, rules, testResults);
+        }
+        return testResults;
+    }
+
+    private void predict(List<String> data, List<Rule> rules, TestResults results) {
         for (Rule rule : rules) {
             if (isComplexCoveringRow(data, rule.getComplex())) {
                 if (rule.getResult().equals(data.get(data.size() - 1))) {
-                    return 1;
+                    results.incrementCorrect();
                 } else {
-                    return -1;
+                    results.incrementIncorrect();
                 }
+                return;
             }
         }
-        return 0;
+        results.incrementNotCovered();
     }
 
-    private List<Selector> cloneComplex(List<Selector> complex) { //TODO duplicate
+    private List<Selector> cloneComplex(List<Selector> complex) {
         List<Selector> cloned = new ArrayList<>();
         for (Selector selector : complex) {
             cloned.add(selector.clone());
@@ -303,12 +281,8 @@ public class CN2 {
                 return null;
             }
         }
-
-        List<Selector> newList = new ArrayList<>();
-        for (Selector s : complex) {
-            newList.add(s.clone());
-        }
-        newList.add(selector);
-        return newList;
+        List<Selector> cloned = cloneComplex(complex);
+        cloned.add(selector);
+        return cloned;
     }
 }

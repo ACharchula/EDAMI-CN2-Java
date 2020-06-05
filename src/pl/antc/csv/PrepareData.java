@@ -1,10 +1,7 @@
 package pl.antc.csv;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class PrepareData {
 
@@ -19,22 +16,36 @@ public class PrepareData {
         discretization(data, 11);
         discretization(data, 12);
 
-        List<List<String>> training = new ArrayList<>();
-        List<List<String>> test = new ArrayList<>();
-        divideData(data, training, test);
-
-        CsvDataHandler.saveCsv(training, "data/adult/training.data");
-        CsvDataHandler.saveCsv(test, "data/adult/test.data");
+        splitAndSave("data/adult/", data);
     }
 
     public static void prepareCarData() throws IOException {
-        List<List<String>> data = CsvDataHandler.readCsv("data/cars/car.data");
+        splitAndSave("data/cars/", "car.data");
+    }
+
+    public static void prepareNurseryData() throws IOException {
+        splitAndSave("data/nursery/", "nursery.data");
+    }
+
+    private static void splitAndSave(String directory, List<List<String>> data) throws IOException {
         List<List<String>> training = new ArrayList<>();
         List<List<String>> test = new ArrayList<>();
-        divideData(data, training, test);
 
-        CsvDataHandler.saveCsv(training, "data/cars/training.data");
-        CsvDataHandler.saveCsv(test, "data/cars/test.data");
+        List<String> attributes = data.get(0);
+
+        List<List<String>> rows = data.subList(1, data.size());
+        Collections.shuffle(rows);
+
+        rows.add(0, attributes);
+        divideData(rows, training, test);
+
+        CsvDataHandler.saveCsv(training, directory + "training.data");
+        CsvDataHandler.saveCsv(test, directory + "test.data");
+    }
+
+    private static void splitAndSave(String directory, String sourceFileName) throws IOException {
+        List<List<String>> data = CsvDataHandler.readCsv(directory + sourceFileName);
+        splitAndSave(directory, data);
     }
 
     private static void divideData(List<List<String>> data, List<List<String>> trainData, List<List<String>> testData) {

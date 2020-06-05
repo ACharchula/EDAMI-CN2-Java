@@ -1,8 +1,5 @@
 package pl.antc.csv;
 
-import pl.antc.csv.CsvDataHandler;
-
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,20 +19,34 @@ public class PrepareData {
         discretization(data, 11);
         discretization(data, 12);
 
-        List<String> attributes = data.get(0);
         List<List<String>> training = new ArrayList<>();
         List<List<String>> test = new ArrayList<>();
-        int amountOfRecords = data.size() - 1; //minus attributes
-        int threshold = (int) Math.floor(amountOfRecords * 0.8);
-
-        training.add(attributes);
-        training.addAll(data.subList(1, threshold+1));
-
-        test.add(attributes);
-        test.addAll(data.subList(threshold + 1, data.size()));
+        divideData(data, training, test);
 
         CsvDataHandler.saveCsv(training, "data/adult/training.data");
         CsvDataHandler.saveCsv(test, "data/adult/test.data");
+    }
+
+    public static void prepareCarData() throws IOException {
+        List<List<String>> data = CsvDataHandler.readCsv("data/cars/car.data");
+        List<List<String>> training = new ArrayList<>();
+        List<List<String>> test = new ArrayList<>();
+        divideData(data, training, test);
+
+        CsvDataHandler.saveCsv(training, "data/cars/training.data");
+        CsvDataHandler.saveCsv(test, "data/cars/test.data");
+    }
+
+    private static void divideData(List<List<String>> data, List<List<String>> trainData, List<List<String>> testData) {
+        int amountOfRecords = data.size() - 1; //minus attributes
+        int threshold = (int) Math.floor(amountOfRecords * 0.8);
+        List<String> attributes = data.get(0);
+
+        trainData.add(attributes);
+        trainData.addAll(data.subList(1, threshold+1));
+
+        testData.add(attributes);
+        testData.addAll(data.subList(threshold + 1, data.size()));
     }
 
     private static void discretization(List<List<String>> data, int column) {

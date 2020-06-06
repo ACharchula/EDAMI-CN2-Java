@@ -30,10 +30,10 @@ public class CN2 {
             List<Selector> bestComplex = findBestComplex();
             if (bestComplex != null) {
                 String mostCommonResult = processComplex(bestComplex);
-//                ruleList.add(new Rule(bestComplex, mostCommonResult));
-                Rule rule = new Rule(bestComplex, mostCommonResult);
-                ruleList.add(rule);
-                System.out.println(rule + " (" + E.size() + ")");
+                ruleList.add(new Rule(bestComplex, mostCommonResult));
+//                Rule rule = new Rule(bestComplex, mostCommonResult);
+//                ruleList.add(rule);
+//                System.out.println(rule + " (" + E.size() + ")");
             } else {
                 break;
             }
@@ -191,6 +191,23 @@ public class CN2 {
         for (List<String> row : testData) {
             predict(row, rules, testResults);
         }
+        return testResults;
+    }
+
+    public TestResults getRuleQuality(String testFilePath, Rule rule) throws IOException {
+        TestResults testResults = new TestResults();
+        List<List<String>> testData = CsvDataHandler.readCsv(testFilePath);
+        testData = testData.subList(1, testData.size());
+        for (List<String> row : testData) {
+            if (isComplexCoveringRow(row, rule.getComplex())) {
+                if (rule.getResult().equals(row.get(row.size()-1))) {
+                    testResults.incrementCorrect();
+                } else {
+                    testResults.incrementIncorrect();
+                }
+            }
+        }
+        testResults.setAmountOfTestRows(testResults.getCorrect() + testResults.getIncorrect());
         return testResults;
     }
 

@@ -25,11 +25,11 @@ public class Main {
                 PrepareData.prepareNurseryData();
                 System.out.println("Done!");
             } else if (choice.equals("2")) {
-                AlgorithmRunner.runCN2("data/adult/training.data", "data/adult/test.data", getStarMaxSize(), getMinSignificance());
+                AlgorithmRunner.runCN2("data/adult/training.data", "data/adult/test.data", getStarMaxSize(), getMinSignificance(), displayRules());
             } else if (choice.equals("3")) {
-                AlgorithmRunner.runCN2("data/cars/training.data", "data/cars/test.data", getStarMaxSize(), getMinSignificance());
+                AlgorithmRunner.runCN2("data/cars/training.data", "data/cars/test.data", getStarMaxSize(), getMinSignificance(), displayRules());
             } else if (choice.equals("4")) {
-                AlgorithmRunner.runCN2("data/nursery/training.data", "data/nursery/test.data", getStarMaxSize(), getMinSignificance());
+                AlgorithmRunner.runCN2("data/nursery/training.data", "data/nursery/test.data", getStarMaxSize(), getMinSignificance(), displayRules());
             } else {
                 break;
             }
@@ -46,5 +46,11 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
         System.out.println("Insert minimum significance [double (comma separated)]: ");
         return scanner.nextDouble();
+    }
+
+    private static boolean displayRules() {
+        System.out.println("Should program display rules and theirs quality [1 - yes, other int - no]: ");
+        Scanner scanner = new Scanner(System.in);
+        return scanner.nextInt() == 1;
     }
 }

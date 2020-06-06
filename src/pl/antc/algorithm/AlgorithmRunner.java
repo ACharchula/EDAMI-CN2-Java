@@ -6,11 +6,12 @@ import pl.antc.model.TestResults;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 
 public class AlgorithmRunner {
 
-    public static void runCN2(String trainFilePath, String testFilePath, int starMaxSize, double minSignificance) throws IOException {
+    public static void runCN2(String trainFilePath, String testFilePath, int starMaxSize, double minSignificance, boolean displayRules) throws IOException {
         CN2 cn2 = new CN2();
 
         System.out.println("=== TRAINING ===");
@@ -36,5 +37,14 @@ public class AlgorithmRunner {
         System.out.println("Incorrect: " + results.getIncorrect());
         System.out.println("Rule not found: " + results.getNotCoveredByAnyRule());
         System.out.println("Accuracy: " + (float) results.getCorrect() / results.getAmountOfTestRows());
+        if (displayRules) {
+            System.out.println("=== Rules ===");
+            for (Rule rule : ruleList) {
+                TestResults ruleQuality = cn2.getRuleQuality(testFilePath, rule);
+                float accuracy = (float) ruleQuality.getCorrect() / ruleQuality.getAmountOfTestRows();
+                System.out.println(rule.toString() + "|| accuracy=" + accuracy + " correct=" + ruleQuality.getCorrect() + " incorrect=" + ruleQuality.getIncorrect());
+            }
+        }
+
     }
 }

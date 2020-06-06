@@ -22,7 +22,10 @@ public class AlgorithmRunner {
         long endTime = new Date().getTime();
 
         System.out.println("Amount of rules: " + ruleList.size());
-        System.out.println("Training time [minutes]: " + TimeUnit.MILLISECONDS.toMinutes(endTime - startTime));
+        long minutes = TimeUnit.MILLISECONDS.toMinutes(endTime-startTime);
+        long minutesInSeconds = TimeUnit.MINUTES.toMillis(minutes);
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(endTime-startTime-minutesInSeconds);
+        System.out.println("Training time: " + minutes + " min " + seconds + " s");
 
         System.out.println("=== TESTING === ");
 
